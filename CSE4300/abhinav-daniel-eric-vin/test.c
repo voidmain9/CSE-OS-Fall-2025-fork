@@ -1,8 +1,3 @@
-struct process{
-    int remainingTime;
-    int arrival;
-}
-
 void testA(){
     struct process processA;
     struct process processB;
