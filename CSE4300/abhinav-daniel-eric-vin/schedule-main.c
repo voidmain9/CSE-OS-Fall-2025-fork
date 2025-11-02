@@ -10,6 +10,13 @@ void scheduleMain(struct process **procArray, int procArraySize, int maxTimestep
     struct process **FIFOQueue = malloc(procArraySize * sizeof(int*));
     struct process **SJFQueue = malloc(procArraySize * sizeof(int*));
 
+    for(int i=0; i<procArraySize; i++) {
+        RRQueue[i] = NULL;
+        STCFQueue[i] = NULL;
+        FIFOQueue[i] = NULL;
+        SJFQueue[i] = NULL;
+    }
+
     //array to keep track of empty/non-empty queues - empty by default
     int emptyQueues[] = {
         1, //RoundRobin
