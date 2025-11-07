@@ -2,6 +2,7 @@
 #include "sjf.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(){
     int procArraySize = 3;
@@ -10,6 +11,10 @@ int main(){
     struct process *processA = (struct process*)malloc(sizeof(struct process));
     struct process *processB = (struct process*)malloc(sizeof(struct process));
     struct process *processC = (struct process*)malloc(sizeof(struct process));
+
+    strcpy(processA->name, "processA");
+    strcpy(processB->name, "processB");
+    strcpy(processC->name, "processC");
 
     processA->remainingTime = 10;
     processB->remainingTime = 3;
@@ -46,6 +51,12 @@ int main(){
         
         sjf(SJFQueue, &SJFQueueidx, t);
     }
+
+    printf("Finish times:\n");
+
+    printf("ProcessA: %d\n", processA->finishTime);
+    printf("ProcessB: %d\n", processB->finishTime);
+    printf("ProcessC: %d\n", processC->finishTime);
 
     printf("tasks completed\n");
 

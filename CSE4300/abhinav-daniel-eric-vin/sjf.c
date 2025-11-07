@@ -13,10 +13,10 @@ void sjf(struct process **procArray, int *len, int globalTime){
     }
 
     if (curr_task != -1){
-        printf("working on task %d, time remaining: %d\n", procArray[curr_task]->priority, procArray[curr_task]->remainingTime);
+        printf("Time %d: Executing %s\n", globalTime, procArray[curr_task]->name);
         procArray[curr_task]->remainingTime--;
         if (procArray[curr_task]->remainingTime == 0){
-            printf("task %d completed, new len is %d\n", procArray[curr_task]->priority, *len - 1);
+            //printf("task %d completed, new len is %d\n", procArray[curr_task]->priority, *len - 1);
             procArray[curr_task]->finishTime = globalTime + 1;
 
             for(int i = curr_task; i < *len - 1; i++){
@@ -36,12 +36,12 @@ void sjf(struct process **procArray, int *len, int globalTime){
             curr_task = i;
         }
     }
-    printf("new task is %d\n", procArray[curr_task]->priority);
+    //printf("new task is %d\n", procArray[curr_task]->priority);
     
-    printf("working on task %d, time remaining: %d\n", procArray[curr_task]->priority, procArray[curr_task]->remainingTime);
+    printf("Time %d: Executing %s\n", globalTime, procArray[curr_task]->name);
     procArray[curr_task]->remainingTime--;
     if (procArray[curr_task]->remainingTime == 0){
-        printf("task %d completed, new len is %d\n", procArray[curr_task]->priority, *len - 1);
+        //printf("task %d completed, new len is %d\n", procArray[curr_task]->priority, *len - 1);
         procArray[curr_task]->finishTime = globalTime + 1;
 
         for(int i = curr_task; i < *len - 1; i++){
