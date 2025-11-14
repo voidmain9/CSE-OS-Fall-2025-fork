@@ -77,7 +77,6 @@ int scheduleMain(struct process **procArray, int procArraySize, int maxTimesteps
         } else {
             printf("Time %d, No-Op\n", t);
         }
-
         t++; //increment time (based on type of algorithm)
         }
 
