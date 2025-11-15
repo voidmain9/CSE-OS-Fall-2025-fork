@@ -30,23 +30,23 @@ void MemoryManager:: _initializeMemory() {
 
 void MemoryManager:: _writeMemory(int physicalAddress, uint8_t data) {
     if (physicalAddress >= PHYSICAL_SIZE || physicalAddress < 0)
-        throw "Physical address out of bounds!";
+        throw std::out_of_range("Physical address out of bounds");
 
     physicalMemory[physicalAddress] = data;
 }
 
 uint8_t MemoryManager:: _readMemory(int physicalAddress) {
     if (physicalAddress >= PHYSICAL_SIZE || physicalAddress < 0)
-        throw "Physical address out of bounds!";
+        throw std::out_of_range("Physical address out of bounds");
 
     return physicalMemory[physicalAddress];
 }
 
 void MemoryManager:: _allocatePage(int virtualPageNumber, int frameNumber) {
     if (virtualPageNumber >= PAGE_COUNT || virtualPageNumber < 0)
-        throw "Invalid virtual page number!";
+        throw std::out_of_range("Invalid virtual page number");
     if (frameNumber >= (PHYSICAL_SIZE / PAGE_SIZE) || frameNumber < 0)
-        throw "Invalid frame number!";
+        throw std::out_of_range("Invalid frame number");
 
     pageTableEntry& entry = pageTable[virtualPageNumber];
 
@@ -65,12 +65,12 @@ int MemoryManager:: _virtualToPhysicalAddress(int virtualAddress, bool writeOper
 
     // now lets validate the virtual address (bounds and valid bit)
     if (virtualPageNumber >= PAGE_COUNT || virtualPageNumber < 0)
-        throw "Attempted to access out-of-bound virtual address!";
+        throw std::out_of_range("Attempted to access out-of-bound virtual address");
 
     pageTableEntry& entry = pageTable[virtualPageNumber];
 
     if (!entry.validBit)
-        throw "Segmentation fault occurred!";
+        throw std::runtime_error("Segmentation fault occurred: Invalid page accessed");
 
     if (!entry.presentBit) {
         _handlePageFault(virtualPageNumber);
@@ -81,7 +81,7 @@ int MemoryManager:: _virtualToPhysicalAddress(int virtualAddress, bool writeOper
     int physicalAddress = (pageFrameNum * PAGE_SIZE) + offset;
 
     if (physicalAddress >= PHYSICAL_SIZE || physicalAddress < 0)
-        throw "Physical address out of bounds!";
+        throw std::out_of_range("Physical address out of bounds");
 
     entry.referenceBit = true;
     if (writeOperation) entry.modifyBit = true;
@@ -153,7 +153,7 @@ int MemoryManager:: _replacePage() {
 
 void MemoryManager:: _wipeMemoryFrame(int frameNumber){
     if (frameNumber >= (PHYSICAL_SIZE / PAGE_SIZE) || frameNumber < 0)
-        throw "Invalid frame number!";
+        throw std::out_of_range("Invalid frame number");
 
     int baseAddress = frameNumber * PAGE_SIZE;
 
@@ -193,7 +193,7 @@ int MemoryManager:: allocateAnyPage() {
             break;
         }
     }
-    if (vpn == -1) throw "No free pages!";
+    if (vpn == -1) throw std::runtime_error("No free pages available for allocation");;
 
     // find open frame using our map of them :P
     int freeFrame = -1;
@@ -225,12 +225,12 @@ uint8_t MemoryManager:: readVirtualMemory(int virtualAddress) {
 void MemoryManager:: deletePageTableEntry(int virtualAddress) {
     int virtualPageNumber = virtualAddress / PAGE_SIZE;
     if (virtualPageNumber >= PAGE_COUNT || virtualPageNumber < 0)
-        throw "Attempted to access out-of-bound virtual address!";
+        throw std::out_of_range("Attempted to access out-of-bound virtual address");
 
     pageTableEntry& entry = pageTable[virtualPageNumber];
 
     if (!entry.validBit)
-        throw "Can't delete invalid page";
+        throw std::logic_error("Attempted to delete an invalid page");
 
     entry.validBit = false;
 
@@ -248,9 +248,10 @@ void MemoryManager:: deletePageTableEntry(int virtualAddress) {
     entry.referenceBit = false;
 }
 
-void MemoryManager:: printPageTableEntry(int virtualPageNumber) {
-    if (virtualPageNumber >= PAGE_COUNT)
-        throw "Invalid page number";
+void MemoryManager:: printPageTableEntry(int virtualAddress) {
+    int virtualPageNumber = virtualAddress / PAGE_SIZE;
+    if (virtualPageNumber >= PAGE_COUNT || virtualPageNumber < 0)
+        throw std::out_of_range("Attempted to access out-of-bound virtual address");
 
     const pageTableEntry& entry = pageTable[virtualPageNumber];
     std::cout << "Page " << virtualPageNumber << ": ";
