@@ -9,13 +9,10 @@
 
 
 struct pageTableEntry {
-    bool modifyBit = false;
-    bool referenceBit = false;
     bool validBit = false;
-    bool readBit = false; // will worry about permissions later
-    bool writeBit = false; // ^^
-    bool executeBit = false; // ^^
     bool presentBit = false; // will implement page replacement later
+    bool referenceBit = false;
+    bool modifyBit = false;
     int pageFrameNum = -1;
 };
 
@@ -28,6 +25,8 @@ class MemoryManager {
         int PAGE_SIZE; // 4096 bytes, 4K per page
         int PAGE_COUNT; // 1024 entries in the page table
         int PHYSICAL_SIZE; // # of bytes of physical memory
+
+        int clockPointer = 0; // for CLOCK page replacement
 
         void _initializeMemory() {
             pageTable.resize(PAGE_COUNT);
@@ -49,7 +48,7 @@ class MemoryManager {
             return physicalMemory[physicalAddress];
         }
 
-        int virtualToPhysicalAddress (int virtualAddress) {
+        int virtualToPhysicalAddress(int virtualAddress, bool writeOperation) {
             // first let's calculate the offset and find the virtual page number
             int offset = virtualAddress & (PAGE_SIZE - 1); // offset is based on the size of each page
             int virtualPageNumber = virtualAddress / PAGE_SIZE; // essentially shifts the number right by 12 bits
@@ -58,10 +57,14 @@ class MemoryManager {
             if (virtualPageNumber >= PAGE_COUNT || virtualPageNumber < 0)
                 throw "Attempted to access out-of-bound virtual address!";
 
-            const pageTableEntry& entry = pageTable[virtualPageNumber];
+            pageTableEntry& entry = pageTable[virtualPageNumber];
 
             if (!entry.validBit)
-                throw "Page fault occurred!";
+                throw "Segmentation fault occurred!";
+
+            if (!entry.presentBit) {
+                _handlePageFault(virtualPageNumber);
+            }
 
             // now we can map the virtual to the physical
             int pageFrameNum = entry.pageFrameNum;
@@ -70,10 +73,96 @@ class MemoryManager {
             if (physicalAddress >= PHYSICAL_SIZE || physicalAddress < 0)
                 throw "Physical address out of bounds!";
 
-            pageTable[virtualPageNumber].referenceBit = true;
+            entry.referenceBit = true;
+            if (writeOperation) entry.modifyBit = true;
 
             return physicalAddress;
         }
+
+        // for securely deleting a page
+        void _wipeMemoryFrame(int frameNumber){
+            if (frameNumber >= (PHYSICAL_SIZE / PAGE_SIZE) || frameNumber < 0)
+                throw "Invalid frame number!";
+
+            int baseAddress = frameNumber * PAGE_SIZE;
+
+            for (int i = 0; i < PAGE_SIZE; i++) {
+                physicalMemory[baseAddress + i] = 0;
+            }
+        }
+
+        void _handlePageFault(int virtualPageNumber){
+            pageTableEntry& entry = pageTable[virtualPageNumber];
+
+            // check for free frame, if none, page replacement
+            int freeFrame = -1;
+            for (int i = 0; i < freeFrames.size(); i++) {
+                if (freeFrames[i]) {
+                    freeFrame = i;
+                    break;
+                }
+            }
+
+            if (freeFrame == -1) {
+                entry.pageFrameNum = _replacePage();
+                _readPageFromDisk(virtualPageNumber);
+            } else
+                entry.pageFrameNum = freeFrame;
+
+            freeFrames[entry.pageFrameNum] = false;
+
+            entry.presentBit = true;
+        }
+
+        // returns new frame number
+        int _replacePage() {
+            // first we do the clock thing
+            int newFrameNumber = _clockReplacement();
+
+            // then we return the new frame number
+            return newFrameNumber;
+        }
+
+        int _clockReplacement() {
+            int frameNumber = -1;
+            int replacedVPN = -1;
+            bool entryWasModified = false;
+
+            bool ticking = true;
+            while (ticking) {
+                if (clockPointer == PAGE_COUNT) clockPointer = 0;
+
+                pageTableEntry& entry = pageTable[clockPointer];
+
+                if (entry.presentBit) {
+                    if (entry.referenceBit) {
+                        entry.referenceBit = false;
+                    } else {
+                        entry.presentBit = false;
+                        frameNumber = entry.pageFrameNum;
+                        replacedVPN = clockPointer;
+                        entryWasModified = entry.modifyBit;
+                        ticking = false;
+                    }
+                }
+
+                clockPointer++;
+            }
+
+            if (entryWasModified) _writePageToDisk(replacedVPN);
+
+            freeFrames[pageTable[replacedVPN].pageFrameNum] = true;
+            pageTable[replacedVPN].pageFrameNum = -1;
+            _wipeMemoryFrame(frameNumber);
+
+            return frameNumber;
+        }
+
+        void _writePageToDisk(int virtualPageNumber){
+
+        }
+
+        void _readPageFromDisk(int virtualPageNumber){}
 
     public:
         MemoryManager()
@@ -92,9 +181,12 @@ class MemoryManager {
             if (frameNumber >= (PHYSICAL_SIZE / PAGE_SIZE) || frameNumber < 0)
                 throw "Invalid frame number!";
 
-            pageTable[virtualPageNumber].validBit = true;
-            pageTable[virtualPageNumber].pageFrameNum = frameNumber;
-            pageTable[virtualPageNumber].presentBit = true;
+            pageTableEntry& entry = pageTable[virtualPageNumber];
+
+
+            entry.validBit = true;
+            entry.pageFrameNum = frameNumber;
+            entry.presentBit = true;
 
             freeFrames[frameNumber] = false;
         }
@@ -119,7 +211,8 @@ class MemoryManager {
                     break;
                 }
             }
-            if (freeFrame == -1) throw "No free physical frames!";
+
+            if (freeFrame == -1) freeFrame = _replacePage(); // page replacement here!
 
             allocatePage(vpn, freeFrame);
 
@@ -128,16 +221,39 @@ class MemoryManager {
         }
 
         void writeVirtualMemory (int virtualAddress, uint8_t data) {
-            int physicalAddress = virtualToPhysicalAddress(virtualAddress);
+            int physicalAddress = virtualToPhysicalAddress(virtualAddress, true);
             writeMemory(physicalAddress, data);
-
-            int vpn = virtualAddress / PAGE_SIZE;
-            pageTable[vpn].modifyBit = true;
         }
 
         uint8_t readVirtualMemory (int virtualAddress) {
-            int physicalAddress = virtualToPhysicalAddress(virtualAddress);
+            int physicalAddress = virtualToPhysicalAddress(virtualAddress, false);
             return readMemory(physicalAddress);
+        }
+
+        void deletePageTableEntry(int virtualAddress) {
+            int virtualPageNumber = virtualAddress / PAGE_SIZE;
+            if (virtualPageNumber >= PAGE_COUNT || virtualPageNumber < 0)
+                throw "Attempted to access out-of-bound virtual address!";
+
+            pageTableEntry& entry = pageTable[virtualPageNumber];
+
+            if (!entry.validBit)
+                throw "Can't delete invalid page";
+
+            entry.validBit = false;
+
+            if (entry.presentBit) {
+                _wipeMemoryFrame(entry.pageFrameNum);
+                entry.presentBit = false;
+                freeFrames[entry.pageFrameNum] = true;
+                entry.pageFrameNum = -1;
+
+            } else {
+                // delete entry from disk
+            }
+
+            entry.modifyBit = false;
+            entry.referenceBit = false;
         }
 
         void printPageTableEntry(int virtualPageNumber) {
@@ -167,8 +283,11 @@ int main() {
 
         int testAddr = mm.allocateAnyPage();
 
-        std::cout << std::showbase << std::hex << "Allocated page for future tests: " << virtualAddress << std::endl;
-        std::cout << "Allocated page to see if any page really works: " << testAddr << std::endl << "- - -" << std::endl << std::endl;
+        std::cout << std::showbase << std::hex << "Allocated page for future tests: " <<
+        virtualAddress << std::endl;
+
+        std::cout << "Allocated page to see if any page really works: " <<
+        testAddr << std::endl << "- - -" << std::endl << std::endl;
 
         for (int i = 0; i < 4096; i++) {
             uint8_t data = i % 256;
@@ -184,7 +303,8 @@ int main() {
             mm.printPageTableEntry(addr / 4096);
 
             std::cout << "Virtual Address: " << addr << std::endl;
-            std::cout << "Value at Physical Address: " << std::dec << static_cast<int>(mm.readVirtualMemory(addr)) << std::endl << std::endl;
+            std::cout << "Value at Physical Address: " << std::dec <<
+            static_cast<int>(mm.readVirtualMemory(addr)) << std::endl << std::endl;
         }
 
         return 0;
@@ -192,6 +312,4 @@ int main() {
         std::cerr << "[FATAL] " << error << std::endl;
         return -1;
     }
-
-
 }
