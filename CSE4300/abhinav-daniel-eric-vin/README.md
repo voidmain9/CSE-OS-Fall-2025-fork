@@ -26,5 +26,5 @@ Compile: ```gcc -o test test.c schedule-main.c rr.c fifo.c srtrf.c sjf.c```\
 Run: ```./test```
 
 ## Windows
-Compile: ```gcc -o test test.c schedule-main.c rr.c fifo.c srtrf.c sjf.c```'
+Compile: ```gcc -o test test.c schedule-main.c rr.c fifo.c srtrf.c sjf.c```\
 Run: ```test ```
