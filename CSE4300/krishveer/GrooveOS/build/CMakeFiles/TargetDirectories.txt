@@ -1,0 +1,3 @@
+/home/krish/CSE-OS-Fall-2025/CSE4300/krishveer/GrooveOS/build/CMakeFiles/grooveos.dir
+/home/krish/CSE-OS-Fall-2025/CSE4300/krishveer/GrooveOS/build/CMakeFiles/edit_cache.dir
+/home/krish/CSE-OS-Fall-2025/CSE4300/krishveer/GrooveOS/build/CMakeFiles/rebuild_cache.dir
